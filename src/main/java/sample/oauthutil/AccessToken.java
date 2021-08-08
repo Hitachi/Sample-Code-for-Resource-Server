@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 public class AccessToken {
     private long exp;
     private String scope;
+    private String preferredUsername;
 
     public long getExp() {
         return exp;
@@ -29,5 +30,13 @@ public class AccessToken {
 
     public List<String> getScopeList() {
         return Arrays.asList(scope.split(" "));
+    }
+
+    public String getPreferredUsername() {
+        return preferredUsername;
+    }
+
+    public void setPreferredUsername(String value) {
+        preferredUsername = value;
     }
 }

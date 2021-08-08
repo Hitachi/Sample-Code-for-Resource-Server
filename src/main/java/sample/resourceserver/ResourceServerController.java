@@ -105,7 +105,8 @@ public class ResourceServerController {
             AccessToken token = OauthUtil.readJsonContent(OauthUtil.decodeFromBase64Url(accessToken), AccessToken.class);
             System.out.println("Scope of Token:"+token.getScope()+"\n");
             if (token.getScopeList().contains("readdata")) {
-                return new ResponseEntity<>(Collections.singletonMap("message", "Your Protected Resource."), HttpStatus.OK);
+                
+                return new ResponseEntity<>(Collections.singletonMap("message", String.format("%s's Protected Resource.", token.getPreferredUsername())), HttpStatus.OK);
             }
             else {
                 System.out.println("Error: readdata scope is not included.");
