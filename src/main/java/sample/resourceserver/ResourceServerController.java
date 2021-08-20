@@ -1,9 +1,16 @@
 package sample.resourceserver;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
@@ -29,22 +36,32 @@ import sample.oauthutil.OauthUtil;
 @RestController
 public class ResourceServerController {
 
+    private static final Logger logger = LoggerFactory.getLogger(ResourceServerController.class);
+
     @Autowired
     ResourceServerConfiguration serverConfig;
 
     @Autowired
     RestTemplate restTemplate;
 
-    private void printRequest(String msg, RequestEntity req) {
+    private void printRequest(String msg, RequestEntity<?> req) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("method", req.getMethod().toString());
+        message.put("url", req.getUrl().toString());
+        message.put("headers", req.getHeaders());
+        if (req.hasBody()) {
+            message.put("body", req.getBody());
+        }
+        logger.debug("ReqeustType=\"" + msg + "\" RequestInfo=" + writeJsonString(req, false));
+        return;
+    }
 
-        System.out.println(msg);
-        System.out.println(req.getMethod().toString());
-        System.out.println(req.getUrl().toString());
-        System.out.println(" - Headers:\n" + req.getHeaders().toString());
-        if (req.hasBody())
-            System.out.println(" - Body:\n" + req.getBody().toString() + "\n");
-        else
-            System.out.println("\n");
+    private void printResponse(String responseType, ResponseEntity<?> resp) {
+        Map<String, Object> message = new HashMap<>();
+        message.put("status", resp.getStatusCode().toString());
+        message.put("headers", resp.getHeaders());
+        message.put("body", resp.getBody());
+        logger.debug("ResponseType=\"" + responseType + "\" ResponseInfo=" + writeJsonString(message, false));
         return;
     }
 
@@ -64,19 +81,15 @@ public class ResourceServerController {
 
         RequestEntity<?> req = new RequestEntity<>(params, headers, HttpMethod.POST, URI.create(introspectUrl.toString()));
         IntrospectionResponse response = null;
-        printRequest("* Introspection request:", req);
-        // System.out.println("Sent Introspection request:"+req.toString()+"\n");
+        printRequest("Introspection Request", req);
 
         try {
             ResponseEntity<IntrospectionResponse> res = restTemplate.exchange(req, IntrospectionResponse.class);
+            printResponse("Introspection Response", res);
             response = res.getBody();
-            System.out.println(
-                    "* Introspection response:\n" + res.getStatusCode() + "\n" + "\"active\":" + response.getActive() + "\n");
             result = response.getActive() == "true";
         } catch (HttpClientErrorException e) {
-            System.out.println("!! response code=" + e.getStatusCode() + "\n");
-            System.out.println(e.getResponseBodyAsString() + "\n");
-
+            logger.error("response code=\"" + e.getStatusCode() + "\" body=" + e.getResponseBodyAsString());
         }
 
         return result;
@@ -105,18 +118,29 @@ public class ResourceServerController {
 
         if (requestTokenIntrospection(accessToken)) {
             AccessToken token = OauthUtil.readJsonContent(OauthUtil.decodeFromBase64Url(accessToken), AccessToken.class);
-            System.out.println("Scope of Token:" + token.getScope() + "\n");
+            logger.debug("Scope of Token: \"" + token.getScope() + "\"");
             if (token.getScopeList().contains("readdata")) {
 
                 return new ResponseEntity<>(Collections.singletonMap("message",
                         String.format("%s's Protected Resource.", token.getPreferredUsername())), HttpStatus.OK);
             } else {
-                System.out.println("Error: readdata scope is not included.");
+                logger.error("readdata scope is not included.");
                 return new ResponseEntity<>(Collections.singletonMap("message", "error!"), HttpStatus.FORBIDDEN);
             }
         } else {
             return new ResponseEntity<>(Collections.singletonMap("message", "error!"), HttpStatus.UNAUTHORIZED);
         }
+    }
+
+    public String writeJsonString(Object obj, boolean indent) {
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure(SerializationFeature.INDENT_OUTPUT, indent);
+        try {
+            return mapper.writeValueAsString(obj);
+        } catch (IOException e) {
+            logger.error("unable to deserialize", e);
+        }
+        return "";
     }
 
     @Bean
