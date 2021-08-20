@@ -19,7 +19,7 @@ public class ResourceServerConfiguration {
         authserverUrl = value;
     }
 
-     public String getIntrospectionEndpoint() {
+    public String getIntrospectionEndpoint() {
         return introspectionEndpoint;
     }
 
